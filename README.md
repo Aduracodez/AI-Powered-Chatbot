@@ -1,85 +1,86 @@
 🤖 AI-Powered Chatbot
-An intelligent, conversational chatbot built with Python and OpenAI GPT models, using a simple Flask web interface.
-It can answer FAQs, hold casual conversations, or serve as a starting point for any AI assistant.
-🧠 Features
-💬 Natural, friendly conversation powered by OpenAI GPT
-⚡ Lightweight Flask backend (easy to run locally or deploy)
-🧩 Offline fallback mode (echoes user input when no API key)
-🪶 Simple web UI built with HTML, CSS, and JavaScript
-🔐 Secure — API key stored as an environment variable
-🧰 Ready for extension (FAQ knowledge base, FastAPI, memory, etc.)
+An intelligent, conversational chatbot built with Python, Flask, and OpenAI GPT models.
+Designed to deliver natural conversations, answer FAQs, or serve as a foundation for your own AI assistant.
+🧠 Key Features
+💬 Natural conversation powered by OpenAI GPT models
+⚡ Lightweight Flask backend — easy to run locally or deploy anywhere
+🧩 Offline fallback mode (echoes user input when no API key is set)
+🪶 Clean, simple web UI built with HTML, CSS, and JavaScript
+🔐 Secure API key management via environment variables
+🧰 Extensible design — add FAQ logic, memory, FastAPI, or more with minimal effort
 🏗️ Project Structure
 AI-Powered-Chatbot/
-├── app.py / main.py          # Flask or FastAPI server
+├── app.py / main.py       # Flask or FastAPI backend
 ├── templates/
-│   └── index.html            # Chat UI
+│   └── index.html         # Chat interface
 ├── static/
-│   └── main.js               # Frontend logic
+│   └── main.js            # Frontend logic
 ├── data/
-│   └── faqs.json             # (optional) FAQ data for Smart mode
-├── requirements.txt          # Python dependencies
-└── README.md                 # This file
+│   └── faqs.json          # (optional) FAQ data
+├── requirements.txt        # Python dependencies
+└── README.md               # Project documentation
 ⚙️ Installation
 1️⃣ Clone the repository
 git clone https://github.com/Aduracodez/AI-Powered-Chatbot.git
 cd AI-Powered-Chatbot
-2️⃣ Create a virtual environment
+2️⃣ Create and activate a virtual environment
+Windows
 python -m venv venv
-# Activate it:
-# Windows
 venv\Scripts\activate
-# macOS / Linux
+macOS / Linux
+python -m venv venv
 source venv/bin/activate
 3️⃣ Install dependencies
 pip install -r requirements.txt
-🔑 Setup OpenAI API Key
-This project uses the OpenAI API for responses.
-Option 1: Temporary (per session)
-# macOS / Linux
+🔑 OpenAI API Setup
+This chatbot uses the OpenAI API for generating responses.
+Option 1 – Temporary (per session)
+macOS / Linux
 export OPENAI_API_KEY=sk-your-key
-# Windows PowerShell
+Windows PowerShell
 $env:OPENAI_API_KEY="sk-your-key"
-Option 2: Persistent via .env
+Option 2 – Persistent (.env file)
 Create a .env file in the project root:
 OPENAI_API_KEY=sk-your-key
 MODEL_NAME=gpt-4o-mini
-Then add this line near the top of your Python file:
+Then load it in your Python file:
 from dotenv import load_dotenv
 load_dotenv()
 ▶️ Run the App
-Flask version:
+Flask version
 python app.py
-FastAPI version (if using main.py):
+FastAPI version
 python main.py
 Then open your browser to:
-http://127.0.0.1:5050/
+👉 http://127.0.0.1:5050/
 🧪 Example Chat
-User:
-Hello there!
-Bot:
-Hi! 👋 How can I help you today?
+User: Hello there!
+Bot: Hi! 👋 How can I help you today?
 🛠️ Customization
-To change the default model → edit:
-model="gpt-4o-mini"   # or "gpt-3.5-turbo"
-To modify system behavior → adjust the system prompt:
+Change the default model
+model = "gpt-4o-mini"  # or "gpt-3.5-turbo"
+Modify the system behavior
 {"role": "system", "content": "You are a friendly support assistant."}
-To add FAQs or context → edit data/faqs.json and integrate them into the chat logic.
+Add FAQs or contextual data
+Edit data/faqs.json
+Integrate it into your chatbot logic for smarter responses
 🚀 Deployment
-You can deploy easily on:
-Render.com
-Railway.app
+You can easily deploy on:
+Render
+Railway
 Vercel (with FastAPI)
 PythonAnywhere
-Each service just needs your repo + the environment variable OPENAI_API_KEY.
+All platforms only require:
+Your repository
+OPENAI_API_KEY as an environment variable
 📜 License
-This project is open-source under the MIT License.
+This project is licensed under the MIT License.
 Feel free to fork, modify, and build on top of it.
-💡 Future Improvements
-🧠 Add memory for multi-turn conversation
-🪄 Integrate FAQ / RAG (retrieval augmented generation)
-🎙️ Add voice chat (Speech-to-Text + Text-to-Speech)
-🧾 Add an admin panel to manage FAQs
-
+💡 Future Enhancements
+🧠 Persistent memory for multi-turn conversations
+🪄 FAQ integration with RAG (Retrieval-Augmented Generation)
+🎙️ Voice mode (Speech-to-Text + Text-to-Speech)
+🧾 Admin panel for FAQ and chat management
 👨‍💻 Author
 @Aduracodez
-Building smart, accessible AI tools for everyone.
+Building smart, accessible AI tools for everyone. 💡

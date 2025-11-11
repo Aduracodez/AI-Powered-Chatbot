@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>AI POWERED Chatbot</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; background:#f6f7fb; margin:0; }
+    .wrap { max-width: 520px; margin: 48px auto; background:#fff; border-radius:12px; padding:16px; box-shadow: 0 12px 30px rgba(0,0,0,.06); }
+    #messages { height: 320px; overflow-y: auto; border:1px solid #e5e7eb; border-radius:10px; padding:12px; background:#fafafa; }
+    .row { display:flex; gap:8px; margin-top:10px; }
+    input { flex:1; padding:10px; border:1px solid #d1d5db; border-radius:8px; }
+    button { padding:10px 14px; border:0; background:#111827; color:#fff; border-radius:8px; cursor:pointer; }
+    .user { color:#1d4ed8; white-space: pre-wrap; }
+    .bot { color:#059669; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>💬 AI Powered Chatbot</h2>
+    <div id="messages"></div>
+    <div class="row">
+      <input id="userInput" placeholder="Type a message and press Enter…" />
+      <button id="sendBtn">Send</button>
+    </div>
+    <p style="color:#6b7280; font-size:12px; margin-top:8px;">
+      Tip: It works offline (echo) if <code>OPENAI_API_KEY</code> isn’t set.
+    </p>
+  </div>
+  <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
+
+

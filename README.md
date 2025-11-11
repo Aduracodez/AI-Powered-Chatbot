@@ -79,6 +79,7 @@ Feel free to fork, modify, and build on top of it.
 🪄 Integrate FAQ / RAG (retrieval augmented generation)
 🎙️ Add voice chat (Speech-to-Text + Text-to-Speech)
 🧾 Add an admin panel to manage FAQs
+
 👨‍💻 Author
 @Aduracodez
 Building smart, accessible AI tools for everyone.

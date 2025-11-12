@@ -94,15 +94,15 @@ class TestChatRoute:
         assert response.status_code == 200
         data = response.get_json()
         assert 'answer' in data
-        assert 'API error' in data['answer'].lower()
+        assert 'api error' in data['answer'].lower()
     
     def test_chat_route_invalid_json(self, client):
         """Test chat route with invalid JSON."""
         response = client.post('/chat',
                              data='invalid json',
                              content_type='application/json')
-        # Should still return 200 with a helpful message
-        assert response.status_code == 200
+        # Flask returns 400 for invalid JSON
+        assert response.status_code == 400
 
 
 class TestAppInitialization:

@@ -5,7 +5,7 @@ load_dotenv()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# Only use OpenAI if a key is present (so the UI still works without 
+# Only use OpenAI if a key is present (so the UI still works without a key) 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = None
 if OPENAI_API_KEY:

@@ -65,8 +65,8 @@ OPENAI_MODELS = [
 ]
 DEFAULT_OPENAI_MODEL = OPENAI_MODELS[0]["id"]
 
-LOCAL_LLM_ENABLED = os.getenv("ENABLE_LOCAL_LLM", "false").lower() == "true"
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+LOCAL_LLM_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+
 LOCAL_MODELS = {
     os.getenv("LOCAL_LLM_MODEL", "llama2"):
         {
@@ -75,6 +75,29 @@ LOCAL_MODELS = {
         }
 }
 DEFAULT_LOCAL_MODEL = next(iter(LOCAL_MODELS.keys()))
+
+
+def str_to_bool(value: str) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def detect_local_llm_enabled() -> bool:
+    env_toggle = os.getenv("ENABLE_LOCAL_LLM")
+    if env_toggle is not None:
+        return str_to_bool(env_toggle)
+
+    # Auto-detect by pinging the Ollama API (or compatible local server)
+    try:
+        response = requests.get(
+            f"{LOCAL_LLM_URL.rstrip('/')}/api/tags",
+            timeout=1.5,
+        )
+        return response.ok
+    except Exception:
+        return False
+
+
+LOCAL_LLM_ENABLED = detect_local_llm_enabled()
 
 MODEL_OPTIONS = {
     "openai": OPENAI_MODELS,
@@ -120,7 +143,7 @@ def call_local_llm(prompt: str, model_id: str) -> str:
     if model_id not in LOCAL_MODELS:
         raise ValueError(f"Unknown local model '{model_id}'")
 
-    url = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+    url = f"{LOCAL_LLM_URL.rstrip('/')}/api/generate"
     response = requests.post(
         url,
         json={

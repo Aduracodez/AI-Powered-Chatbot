@@ -1,0 +1,11 @@
+[build]
+# Explicitly tell Railway to use the Nixpacks Python buildpack
+builder = "NIXPACKS"
+
+[build.args]
+# Ensure the Python build phase is enabled
+NIXPACKS_PHASES = "python"
+
+[start]
+# Use gunicorn to serve the Flask app in production
+cmd = "gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 120 wsgi:app"

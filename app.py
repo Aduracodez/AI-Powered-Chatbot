@@ -146,7 +146,8 @@ def clear_history():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # Explicit host/port to avoid confusion
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    # Development server only - use gunicorn for production
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    app.run(host="127.0.0.1", port=5000, debug=debug_mode)
 
 

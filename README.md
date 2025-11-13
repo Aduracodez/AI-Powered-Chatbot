@@ -5,10 +5,12 @@ A Flask-based chatbot application with OpenAI integration.
 ## Features
 
 - 🤖 AI-powered chat using OpenAI GPT-3.5-turbo
+- 💾 Database integration with SQLite/PostgreSQL for chat history
 - 🔄 Offline fallback mode (works without API key)
 - 🎨 Modern, clean UI
 - ✅ Comprehensive test coverage
 - 🚀 CI/CD pipeline with GitHub Actions
+- 📦 Production-ready with gunicorn
 
 ## Setup
 
@@ -44,6 +46,8 @@ pip install -r requirements-dev.txt
 5. Create a `.env` file in the root directory:
 ```bash
 OPENAI_API_KEY=your-api-key-here
+# Optional: For PostgreSQL in production
+# DATABASE_URL=postgresql://user:password@host:port/dbname
 ```
 
 6. Run the application:
@@ -51,7 +55,9 @@ OPENAI_API_KEY=your-api-key-here
 python app.py
 ```
 
-The app will be available at `http://127.0.0.1:5050`
+The app will be available at `http://127.0.0.1:5000`
+
+**Note:** The database (SQLite by default) will be created automatically on first run.
 
 ## Development
 
@@ -95,6 +101,30 @@ Run bandit security linter:
 bandit -r .
 ```
 
+## Deployment
+
+For production deployment, see [DEPLOYMENT.md](DEPLOYMENT.md) for detailed guides on:
+
+- 🚂 Railway
+- 🎨 Render
+- 🟣 Heroku
+- ☁️ AWS Elastic Beanstalk
+- 🐳 Docker
+- And more!
+
+**Quick start with Railway (easiest):**
+1. Push code to GitHub
+2. Connect repo to [railway.app](https://railway.app)
+3. Add environment variables
+4. Deploy! ✨
+
+## API Endpoints
+
+- `POST /chat` - Send a message to the chatbot
+- `GET /history` - Get chat history for a session
+- `GET /history/all` - Get all chat history
+- `POST /history/clear` - Clear chat history
+
 ## CI/CD Pipeline
 
 The project includes a GitHub Actions CI/CD pipeline that:
@@ -124,8 +154,13 @@ AI_Power_Chatbot/
 │   ├── __init__.py
 │   └── test_app.py         # Test suite
 ├── app.py                  # Main Flask application
+├── models.py               # Database models
+├── wsgi.py                 # WSGI entry point for production
 ├── requirements.txt        # Production dependencies
 ├── requirements-dev.txt    # Development dependencies
+├── Procfile                # For Heroku/Railway deployment
+├── Dockerfile              # Docker configuration
+├── DEPLOYMENT.md           # Deployment guide
 ├── pytest.ini             # Pytest configuration
 ├── .flake8                 # Flake8 configuration
 └── pyproject.toml          # Black, isort, coverage config

@@ -4,8 +4,48 @@ const sendBtn = document.getElementById("sendBtn");
 const sendLabel = sendBtn.querySelector(".label");
 const statusEl = document.getElementById("status");
 const formEl = document.getElementById("chatForm");
+const languageSelect = document.getElementById("languageSelect");
 
+const translations = {
+  en: {
+    greeting: "Hey there! I’m your AI assistant. Ask me anything or say hello 👋",
+    placeholder: "Type a message…",
+    labelSend: "Send",
+    labelSending: "Sending…",
+    statusReady: "Ready to chat ✨",
+    statusThinking: "Thinking…",
+    statusEmpty: "Please type something first.",
+    statusNetworkError: "Network error. Please try again.",
+    statusOffline: "OpenAI key missing – running in demo mode.",
+    statusApiError: "OpenAI couldn’t respond. Showing fallback.",
+    statusSuccess: "All good! Ask away.",
+    languageChanged: "Got it! I’ll reply in English.",
+    languageChangedPrompt: "Language updated to English.",
+  },
+  de: {
+    greeting: "Hallo! Ich bin deine KI-Assistentin. Stell mir eine Frage oder sag Hallo 👋",
+    placeholder: "Schreibe eine Nachricht…",
+    labelSend: "Senden",
+    labelSending: "Sende…",
+    statusReady: "Bereit zum Chatten ✨",
+    statusThinking: "Ich denke nach…",
+    statusEmpty: "Bitte schreibe zuerst etwas.",
+    statusNetworkError: "Netzwerkfehler. Bitte versuche es erneut.",
+    statusOffline: "OpenAI-Schlüssel fehlt – Demo-Modus aktiv.",
+    statusApiError: "OpenAI konnte nicht antworten. Zeige Fallback.",
+    statusSuccess: "Alles gut! Stell deine Frage.",
+    languageChanged: "Alles klar! Ich antworte jetzt auf Deutsch.",
+    languageChangedPrompt: "Sprache auf Deutsch umgestellt.",
+  },
+};
+
+let currentLanguage = languageSelect?.value || "en";
 const sessionId = getOrCreateSessionId();
+
+function t(key) {
+  const catalog = translations[currentLanguage] || translations.en;
+  return catalog[key] ?? key;
+}
 
 function getOrCreateSessionId() {
   const STORAGE_KEY = "chatbot_session_id";
@@ -56,12 +96,12 @@ function setLoading(isLoading) {
   if (isLoading) {
     sendBtn.disabled = true;
     inputEl.disabled = true;
-    sendLabel.textContent = "Sending…";
-    setStatus("Thinking…", "info");
+    sendLabel.textContent = t("labelSending");
+    setStatus(t("statusThinking"), "info");
   } else {
     sendBtn.disabled = false;
     inputEl.disabled = false;
-    sendLabel.textContent = "Send";
+    sendLabel.textContent = t("labelSend");
   }
 }
 
@@ -74,7 +114,7 @@ async function handleSubmit(event) {
   event.preventDefault();
   const message = inputEl.value.trim();
   if (!message) {
-    setStatus("Please type something first.", "error");
+    setStatus(t("statusEmpty"), "error");
     return;
   }
 
@@ -87,39 +127,63 @@ async function handleSubmit(event) {
     const response = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, session_id: sessionId }),
+      body: JSON.stringify({
+        message,
+        session_id: sessionId,
+        language: currentLanguage,
+      }),
     });
 
     const data = await response.json();
     const reply = data.answer || "(no response)";
     appendMessage("bot", reply);
 
-    if (reply.startsWith("(API error)")) {
-      setStatus("OpenAI couldn’t respond. Showing fallback.", "error");
-    } else if (reply.startsWith("(offline demo)")) {
-      setStatus("OpenAI key missing – running in demo mode.", "info");
-    } else {
-      setStatus("All good! Ask away.", "success");
+    switch (data.mode) {
+      case "offline":
+        setStatus(t("statusOffline"), "info");
+        break;
+      case "error":
+        setStatus(t("statusApiError"), "error");
+        break;
+      default:
+        setStatus(t("statusSuccess"), "success");
+        break;
     }
   } catch (error) {
     console.error(error);
     appendMessage("bot", "(network error)");
-    setStatus("Network error. Please try again.", "error");
+    setStatus(t("statusNetworkError"), "error");
   } finally {
     setLoading(false);
     inputEl.focus();
   }
 }
 
+function applyLanguageSettings() {
+  inputEl.placeholder = t("placeholder");
+  sendLabel.textContent = t("labelSend");
+  if (!statusEl.textContent) {
+    setStatus(t("statusReady"), "info");
+  }
+}
+
+function handleLanguageChange(event) {
+  currentLanguage = event.target.value;
+  const message = t("languageChanged");
+  applyLanguageSettings();
+  setStatus(t("languageChangedPrompt"), "success");
+  appendMessage("bot", message);
+  inputEl.focus();
+}
+
 function setup() {
-  appendMessage(
-    "bot",
-    "Hey there! I’m your AI assistant. Ask me anything or say hello 👋"
-  );
+  applyLanguageSettings();
+  appendMessage("bot", t("greeting"));
   resetInputHeight();
   inputEl.focus();
 
   inputEl.addEventListener("input", resetInputHeight);
+  formEl.addEventListener("submit", handleSubmit);
 
   inputEl.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -128,7 +192,7 @@ function setup() {
     }
   });
 
-  formEl.addEventListener("submit", handleSubmit);
+  languageSelect.addEventListener("change", handleLanguageChange);
 }
 
 setup();

@@ -37,7 +37,8 @@ class TestChatRoute:
                              content_type='application/json')
         assert response.status_code == 200
         data = response.get_json()
-        assert 'answer' in data
+        assert data['mode'] == 'error'
+        assert data['language'] == 'en'
         assert 'Please type something' in data['answer']
     
     def test_chat_route_with_empty_string(self, client):
@@ -47,6 +48,7 @@ class TestChatRoute:
                              content_type='application/json')
         assert response.status_code == 200
         data = response.get_json()
+        assert data['mode'] == 'error'
         assert 'Please type something' in data['answer']
     
     @patch.dict(os.environ, {}, clear=True)
@@ -54,13 +56,14 @@ class TestChatRoute:
     def test_chat_route_offline_mode(self, client):
         """Test chat route in offline mode (no OpenAI key)."""
         response = client.post('/chat',
-                             json={'message': 'Hello'},
+                             json={'message': 'Hallo', 'language': 'de'},
                              content_type='application/json')
         assert response.status_code == 200
         data = response.get_json()
-        assert 'answer' in data
-        assert 'offline demo' in data['answer'].lower()
-        assert 'Hello' in data['answer']
+        assert data['mode'] == 'offline'
+        assert data['language'] == 'de'
+        assert 'Offline-Demo' in data['answer']
+        assert 'Hallo' in data['answer']
     
     @patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
     @patch('app.openai_client')
@@ -77,7 +80,8 @@ class TestChatRoute:
                              content_type='application/json')
         assert response.status_code == 200
         data = response.get_json()
-        assert 'answer' in data
+        assert data['mode'] == 'api'
+        assert data['language'] == 'en'
         assert data['answer'] == "Hello! How can I help you?"
         mock_client.chat.completions.create.assert_called_once()
     
@@ -93,7 +97,8 @@ class TestChatRoute:
                              content_type='application/json')
         assert response.status_code == 200
         data = response.get_json()
-        assert 'answer' in data
+        assert data['mode'] == 'error'
+        assert data['language'] == 'en'
         assert 'api error' in data['answer'].lower()
     
     def test_chat_route_invalid_json(self, client):

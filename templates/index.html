@@ -89,7 +89,15 @@
       flex: 1;
     }
 
-    .language-picker {
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .picker {
       display: inline-flex;
       align-items: center;
       gap: 10px;
@@ -102,11 +110,11 @@
       font-weight: 500;
     }
 
-    .language-picker label {
+    .picker label {
       cursor: pointer;
     }
 
-    .language-picker select {
+    .picker select {
       appearance: none;
       background: transparent;
       border: none;
@@ -116,7 +124,7 @@
       cursor: pointer;
     }
 
-    .language-picker select:focus {
+    .picker select:focus {
       outline: none;
     }
 
@@ -343,12 +351,22 @@
       <h1><span>🤖</span>AI Powered Chatbot</h1>
       <div class="toolbar">
         <p>Chat with your AI assistant, even when OpenAI is offline.</p>
-        <div class="language-picker">
-          <label for="languageSelect">Language</label>
-          <select id="languageSelect" aria-label="Choose chat language">
-            <option value="en">English</option>
-            <option value="de">Deutsch</option>
-          </select>
+        <div class="control-group">
+          <div class="picker">
+            <label for="languageSelect">Language</label>
+            <select id="languageSelect" aria-label="Choose chat language">
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+            </select>
+          </div>
+          <div class="picker">
+            <label for="providerSelect">Provider</label>
+            <select id="providerSelect" aria-label="Choose AI provider"></select>
+          </div>
+          <div class="picker" id="modelPicker">
+            <label for="modelSelect">Model</label>
+            <select id="modelSelect" aria-label="Choose AI model"></select>
+          </div>
         </div>
       </div>
     </header>
@@ -374,6 +392,9 @@
     </footer>
   </main>
 
+  <script>
+    window.appConfig = {{ app_config | tojson }};
+  </script>
   <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
 </html>

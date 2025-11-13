@@ -1,3 +1,4 @@
+const appConfig = window.appConfig || {};
 const messagesEl = document.getElementById("messages");
 const inputEl = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
@@ -5,6 +6,13 @@ const sendLabel = sendBtn.querySelector(".label");
 const statusEl = document.getElementById("status");
 const formEl = document.getElementById("chatForm");
 const languageSelect = document.getElementById("languageSelect");
+const providerSelect = document.getElementById("providerSelect");
+const modelSelect = document.getElementById("modelSelect");
+const modelPicker = document.getElementById("modelPicker");
+
+const modelOptions = appConfig.modelOptions || {};
+const defaultModels = appConfig.defaultModels || {};
+const localLLMEnabled = appConfig.localLLMEnabled ?? false;
 
 const translations = {
   en: {
@@ -19,8 +27,17 @@ const translations = {
     statusOffline: "OpenAI key missing – running in demo mode.",
     statusApiError: "OpenAI couldn’t respond. Showing fallback.",
     statusSuccess: "All good! Ask away.",
+    statusLocalDisabled: "Local model is not enabled. Please start the service or pick OpenAI.",
+    statusLocalError: "Local model failed. See logs and try again.",
+    providerOpenAI: "OpenAI",
+    providerLocal: "Local LLM",
+    providerOpenAINotice: "Using OpenAI (requires API key).",
+    providerLocalNotice: localLLMEnabled
+      ? "Using the local model. Make sure Ollama is running."
+      : "Local model currently disabled.",
     languageChanged: "Got it! I’ll reply in English.",
     languageChangedPrompt: "Language updated to English.",
+    modelChanged: "Model switched to {model}.",
   },
   de: {
     greeting: "Hallo! Ich bin deine KI-Assistentin. Stell mir eine Frage oder sag Hallo 👋",
@@ -34,17 +51,41 @@ const translations = {
     statusOffline: "OpenAI-Schlüssel fehlt – Demo-Modus aktiv.",
     statusApiError: "OpenAI konnte nicht antworten. Zeige Fallback.",
     statusSuccess: "Alles gut! Stell deine Frage.",
+    statusLocalDisabled: "Lokales Modell nicht aktiviert. Starte den Dienst oder wähle OpenAI.",
+    statusLocalError: "Lokales Modell fehlgeschlagen. Prüfe die Logs und versuche es erneut.",
+    providerOpenAI: "OpenAI",
+    providerLocal: "Lokales LLM",
+    providerOpenAINotice: "Verwende OpenAI (API-Schlüssel erforderlich).",
+    providerLocalNotice: localLLMEnabled
+      ? "Verwende das lokale Modell. Stelle sicher, dass Ollama läuft."
+      : "Lokales Modell derzeit deaktiviert.",
     languageChanged: "Alles klar! Ich antworte jetzt auf Deutsch.",
     languageChangedPrompt: "Sprache auf Deutsch umgestellt.",
+    modelChanged: "Modell zu {model} gewechselt.",
   },
 };
 
 let currentLanguage = languageSelect?.value || "en";
+let currentProvider = appConfig.defaultProvider || "openai";
+let currentModel = defaultModels[currentProvider] ||
+  (modelOptions[currentProvider] || [])[0]?.id || "";
 const sessionId = getOrCreateSessionId();
 
 function t(key) {
   const catalog = translations[currentLanguage] || translations.en;
   return catalog[key] ?? key;
+}
+
+function format(key, vars = {}) {
+  const template = t(key);
+  return template.replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? "");
+}
+
+function providerLabel(providerId) {
+  if (providerId === "local") {
+    return t("providerLocal");
+  }
+  return t("providerOpenAI");
 }
 
 function getOrCreateSessionId() {
@@ -110,6 +151,38 @@ function resetInputHeight() {
   inputEl.style.height = `${Math.min(inputEl.scrollHeight, 160)}px`;
 }
 
+function populateProviderSelect() {
+  providerSelect.innerHTML = "";
+  Object.keys(modelOptions).forEach((providerId) => {
+    const option = document.createElement("option");
+    option.value = providerId;
+    option.textContent = providerLabel(providerId);
+    providerSelect.appendChild(option);
+  });
+  providerSelect.value = currentProvider;
+}
+
+function populateModelSelect() {
+  const options = modelOptions[currentProvider] || [];
+  modelSelect.innerHTML = "";
+  if (!options.length) {
+    modelPicker.style.display = "none";
+    currentModel = "";
+    return;
+  }
+  modelPicker.style.display = "inline-flex";
+  options.forEach(({ id, label }) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = label;
+    modelSelect.appendChild(option);
+  });
+  if (!options.some(({ id }) => id === currentModel)) {
+    currentModel = defaultModels[currentProvider] || options[0].id;
+  }
+  modelSelect.value = currentModel;
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
   const message = inputEl.value.trim();
@@ -131,6 +204,8 @@ async function handleSubmit(event) {
         message,
         session_id: sessionId,
         language: currentLanguage,
+        provider: currentProvider,
+        model: currentModel,
       }),
     });
 
@@ -145,9 +220,14 @@ async function handleSubmit(event) {
       case "error":
         setStatus(t("statusApiError"), "error");
         break;
+      case "local_disabled":
+        setStatus(t("statusLocalDisabled"), "error");
+        break;
+      case "local_error":
+        setStatus(t("statusLocalError"), "error");
+        break;
       default:
         setStatus(t("statusSuccess"), "success");
-        break;
     }
   } catch (error) {
     console.error(error);
@@ -169,15 +249,32 @@ function applyLanguageSettings() {
 
 function handleLanguageChange(event) {
   currentLanguage = event.target.value;
-  const message = t("languageChanged");
   applyLanguageSettings();
   setStatus(t("languageChangedPrompt"), "success");
-  appendMessage("bot", message);
+  appendMessage("bot", t("languageChanged"));
+  inputEl.focus();
+}
+
+function handleProviderChange(event) {
+  currentProvider = event.target.value;
+  currentModel = defaultModels[currentProvider] ||
+    (modelOptions[currentProvider] || [])[0]?.id || "";
+  populateModelSelect();
+  const noticeKey = currentProvider === "local" ? "providerLocalNotice" : "providerOpenAINotice";
+  setStatus(t(noticeKey), currentProvider === "local" && !localLLMEnabled ? "error" : "info");
+  inputEl.focus();
+}
+
+function handleModelChange(event) {
+  currentModel = event.target.value;
+  setStatus(format("modelChanged", { model: event.target.selectedOptions[0]?.textContent || currentModel }), "info");
   inputEl.focus();
 }
 
 function setup() {
   applyLanguageSettings();
+  populateProviderSelect();
+  populateModelSelect();
   appendMessage("bot", t("greeting"));
   resetInputHeight();
   inputEl.focus();
@@ -193,6 +290,8 @@ function setup() {
   });
 
   languageSelect.addEventListener("change", handleLanguageChange);
+  providerSelect.addEventListener("change", handleProviderChange);
+  modelSelect.addEventListener("change", handleModelChange);
 }
 
 setup();

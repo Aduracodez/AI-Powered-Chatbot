@@ -1,7 +1,7 @@
 import pytest
 import os
 from unittest.mock import patch, MagicMock
-from app import app
+from app import app, DEFAULT_LOCAL_MODEL, DEFAULT_OPENAI_MODEL
 
 
 @pytest.fixture
@@ -39,6 +39,7 @@ class TestChatRoute:
         data = response.get_json()
         assert data['mode'] == 'error'
         assert data['language'] == 'en'
+        assert data['provider'] == 'openai'
         assert 'Please type something' in data['answer']
     
     def test_chat_route_with_empty_string(self, client):
@@ -49,6 +50,7 @@ class TestChatRoute:
         assert response.status_code == 200
         data = response.get_json()
         assert data['mode'] == 'error'
+        assert data['provider'] == 'openai'
         assert 'Please type something' in data['answer']
     
     @patch.dict(os.environ, {}, clear=True)
@@ -62,6 +64,7 @@ class TestChatRoute:
         data = response.get_json()
         assert data['mode'] == 'offline'
         assert data['language'] == 'de'
+        assert data['provider'] == 'openai'
         assert 'Offline-Demo' in data['answer']
         assert 'Hallo' in data['answer']
     
@@ -76,12 +79,13 @@ class TestChatRoute:
         mock_client.chat.completions.create.return_value = mock_response
         
         response = client.post('/chat',
-                             json={'message': 'Hello'},
+                             json={'message': 'Hello', 'model': DEFAULT_OPENAI_MODEL},
                              content_type='application/json')
         assert response.status_code == 200
         data = response.get_json()
         assert data['mode'] == 'api'
         assert data['language'] == 'en'
+        assert data['provider'] == 'openai'
         assert data['answer'] == "Hello! How can I help you?"
         mock_client.chat.completions.create.assert_called_once()
     
@@ -99,7 +103,35 @@ class TestChatRoute:
         data = response.get_json()
         assert data['mode'] == 'error'
         assert data['language'] == 'en'
+        assert data['provider'] == 'openai'
         assert 'api error' in data['answer'].lower()
+    
+    @patch('app.LOCAL_LLM_ENABLED', False)
+    def test_chat_route_local_disabled(self, client):
+        """Ensure helpful message when local provider selected but disabled."""
+        response = client.post('/chat',
+                             json={'message': 'Hallo', 'provider': 'local', 'language': 'de', 'model': DEFAULT_LOCAL_MODEL},
+                             content_type='application/json')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['mode'] == 'local_disabled'
+        assert data['provider'] == 'local'
+        assert 'Lokales Modell' in data['answer']
+    
+    @patch('app.LOCAL_LLM_ENABLED', True)
+    @patch('app.call_local_llm')
+    def test_chat_route_local_success(self, mock_local_llm, client):
+        """Test chat route with local LLM provider."""
+        mock_local_llm.return_value = "Hallo! Wie kann ich helfen?"
+        response = client.post('/chat',
+                             json={'message': 'Hallo', 'provider': 'local', 'model': DEFAULT_LOCAL_MODEL, 'language': 'de'},
+                             content_type='application/json')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['mode'] == 'api'
+        assert data['provider'] == 'local'
+        assert 'Hallo!' in data['answer']
+        mock_local_llm.assert_called_once()
     
     def test_chat_route_invalid_json(self, client):
         """Test chat route with invalid JSON."""

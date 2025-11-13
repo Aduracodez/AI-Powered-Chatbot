@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import os
 from dotenv import load_dotenv
 from models import db, Conversation
+import requests
 
 load_dotenv()
 
@@ -33,6 +34,10 @@ SUPPORTED_LANGUAGES = {
         ),
         "offline_template": "(offline demo) You said: {message}",
         "api_error_template": "(API error) {error}",
+        "local_disabled_template": (
+            "(local model unavailable) Enable the local LLM service or choose OpenAI."
+        ),
+        "local_error_template": "(Local model error) {error}",
     },
     "de": {
         "label": "German",
@@ -44,9 +49,47 @@ SUPPORTED_LANGUAGES = {
         ),
         "offline_template": "(Offline-Demo) Du hast gesagt: {message}",
         "api_error_template": "(API-Fehler) {error}",
+        "local_disabled_template": (
+            "(Lokales Modell nicht verfügbar) Aktiviere den lokalen Dienst oder wähle OpenAI."
+        ),
+        "local_error_template": "(Fehler im lokalen Modell) {error}",
     },
 }
 DEFAULT_LANGUAGE = "en"
+
+OPENAI_MODELS = [
+    {
+        "id": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+        "label": "GPT-3.5 Turbo",
+    }
+]
+DEFAULT_OPENAI_MODEL = OPENAI_MODELS[0]["id"]
+
+LOCAL_LLM_ENABLED = os.getenv("ENABLE_LOCAL_LLM", "false").lower() == "true"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+LOCAL_MODELS = {
+    os.getenv("LOCAL_LLM_MODEL", "llama2"):
+        {
+            "label": os.getenv("LOCAL_LLM_LABEL", "LLaMA 2 (via Ollama)"),
+            "provider": "ollama",
+        }
+}
+DEFAULT_LOCAL_MODEL = next(iter(LOCAL_MODELS.keys()))
+
+MODEL_OPTIONS = {
+    "openai": OPENAI_MODELS,
+    "local": [
+        {"id": model_id, "label": meta["label"]}
+        for model_id, meta in LOCAL_MODELS.items()
+    ],
+}
+DEFAULT_PROVIDER = os.getenv("DEFAULT_MODEL_PROVIDER", "openai")
+if DEFAULT_PROVIDER not in MODEL_OPTIONS:
+    DEFAULT_PROVIDER = "openai"
+DEFAULT_MODELS = {
+    "openai": DEFAULT_OPENAI_MODEL,
+    "local": DEFAULT_LOCAL_MODEL,
+}
 
 # Only use OpenAI if a key is present (so the UI still works without a key) 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -58,9 +101,53 @@ if OPENAI_API_KEY:
     except Exception:
         openai_client = None  # fall back gracefully
 
+
+def build_system_prompt(language_data, user_msg):
+    """Construct a prompt for local LLMs using the language-specific system instructions."""
+    return (
+        f"{language_data['system_prompt']}\n\n"
+        f"User: {user_msg}\n"
+        "Assistant:"
+    )
+
+
+def call_local_llm(prompt: str, model_id: str) -> str:
+    """Call a locally hosted LLM (e.g., via Ollama)."""
+    if not LOCAL_LLM_ENABLED:
+        raise RuntimeError("Local LLM not enabled")
+
+    model_id = model_id or DEFAULT_LOCAL_MODEL
+    if model_id not in LOCAL_MODELS:
+        raise ValueError(f"Unknown local model '{model_id}'")
+
+    url = f"{OLLAMA_URL.rstrip('/')}/api/generate"
+    response = requests.post(
+        url,
+        json={
+            "model": model_id,
+            "prompt": prompt,
+            "stream": False,
+        },
+        timeout=120,
+    )
+    response.raise_for_status()
+    data = response.json()
+    reply = data.get("response", "").strip()
+    if not reply:
+        raise RuntimeError("Local model returned an empty response")
+    return reply
+
+
 @app.route("/")
 def home():
-    return render_template("index.html")
+    app_config = {
+        "modelOptions": MODEL_OPTIONS,
+        "defaultProvider": DEFAULT_PROVIDER,
+        "defaultModels": DEFAULT_MODELS,
+        "localLLMEnabled": LOCAL_LLM_ENABLED,
+    }
+    return render_template("index.html", app_config=app_config)
+
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -71,34 +158,54 @@ def chat():
         language_code = DEFAULT_LANGUAGE
     language_data = SUPPORTED_LANGUAGES[language_code]
 
+    provider = (payload.get("provider") or DEFAULT_PROVIDER).lower()
+    if provider not in MODEL_OPTIONS:
+        provider = DEFAULT_PROVIDER
+
     if not user_msg:
         # Message for empty input always returned in English to keep tests deterministic
         return jsonify({
             "answer": "Please type something 🙂",
             "mode": "error",
             "language": language_code,
+            "provider": provider,
         })
 
     reply = ""
     mode = "api"
 
-    if not openai_client:
-        reply = language_data["offline_template"].format(message=user_msg)
-        mode = "offline"
+    if provider == "local":
+        if not LOCAL_LLM_ENABLED:
+            reply = language_data["local_disabled_template"]
+            mode = "local_disabled"
+        else:
+            try:
+                model_id = payload.get("model") or DEFAULT_LOCAL_MODEL
+                prompt = build_system_prompt(language_data, user_msg)
+                reply = call_local_llm(prompt, model_id)
+            except Exception as exc:  # broad catch to avoid breaking UI
+                reply = language_data["local_error_template"].format(error=exc)
+                mode = "local_error"
     else:
-        try:
-            resp = openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": language_data["system_prompt"]},
-                    {"role": "user", "content": user_msg}
-                ],
-                temperature=0.3,
-            )
-            reply = resp.choices[0].message.content
-        except Exception as e:
-            reply = language_data["api_error_template"].format(error=e)
-            mode = "error"
+        # Default to OpenAI provider
+        if not openai_client:
+            reply = language_data["offline_template"].format(message=user_msg)
+            mode = "offline"
+        else:
+            try:
+                model_name = payload.get("model") or DEFAULT_OPENAI_MODEL
+                resp = openai_client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": language_data["system_prompt"]},
+                        {"role": "user", "content": user_msg}
+                    ],
+                    temperature=0.3,
+                )
+                reply = resp.choices[0].message.content
+            except Exception as e:
+                reply = language_data["api_error_template"].format(error=e)
+                mode = "error"
 
     # Store conversation in database
     try:
@@ -118,6 +225,7 @@ def chat():
         "answer": reply,
         "mode": mode,
         "language": language_code,
+        "provider": provider,
     })
 
 

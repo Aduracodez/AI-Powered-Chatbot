@@ -273,113 +273,113 @@ def chat():
             }), 400
         
         user_msg = payload.get("message", "").strip()
-    language_code = (payload.get("language") or DEFAULT_LANGUAGE).lower()
-    if language_code not in SUPPORTED_LANGUAGES:
-        language_code = DEFAULT_LANGUAGE
-    language_data = SUPPORTED_LANGUAGES[language_code]
+        language_code = (payload.get("language") or DEFAULT_LANGUAGE).lower()
+        if language_code not in SUPPORTED_LANGUAGES:
+            language_code = DEFAULT_LANGUAGE
+        language_data = SUPPORTED_LANGUAGES[language_code]
 
-    provider = (payload.get("provider") or DEFAULT_PROVIDER).lower()
-    if provider not in MODEL_OPTIONS:
-        provider = DEFAULT_PROVIDER
+        provider = (payload.get("provider") or DEFAULT_PROVIDER).lower()
+        if provider not in MODEL_OPTIONS:
+            provider = DEFAULT_PROVIDER
 
-    if not user_msg:
-        # Message for empty input always returned in English to keep tests deterministic
-        return jsonify({
-            "answer": "Please type something 🙂",
-            "mode": "error",
-            "language": language_code,
-            "provider": provider,
-        })
+        if not user_msg:
+            # Message for empty input always returned in English to keep tests deterministic
+            return jsonify({
+                "answer": "Please type something 🙂",
+                "mode": "error",
+                "language": language_code,
+                "provider": provider,
+            })
 
-    reply = ""
-    mode = "api"
+        reply = ""
+        mode = "api"
 
-    if provider == "local":
-        if not LOCAL_LLM_ENABLED:
-            reply = language_data["local_disabled_template"]
-            mode = "local_disabled"
+        if provider == "local":
+            if not LOCAL_LLM_ENABLED:
+                reply = language_data["local_disabled_template"]
+                mode = "local_disabled"
+            else:
+                try:
+                    model_id = payload.get("model") or DEFAULT_LOCAL_MODEL
+                    prompt = build_system_prompt(language_data, user_msg)
+                    reply = call_local_llm(prompt, model_id)
+                except Exception as exc:  # broad catch to avoid breaking UI
+                    reply = language_data["local_error_template"].format(error=exc)
+                    mode = "local_error"
+        elif provider == "groq":
+            if not groq_client:
+                reply = language_data["groq_disabled_template"]
+                mode = "groq_disabled"
+            else:
+                try:
+                    model_name = payload.get("model") or DEFAULT_GROQ_MODEL
+                    resp = groq_client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": language_data["system_prompt"]},
+                            {"role": "user", "content": user_msg}
+                        ],
+                        temperature=0.3,
+                    )
+                    reply = resp.choices[0].message.content
+                except Exception as e:
+                    reply = language_data["api_error_template"].format(error=e)
+                    mode = "error"
         else:
-            try:
-                model_id = payload.get("model") or DEFAULT_LOCAL_MODEL
-                prompt = build_system_prompt(language_data, user_msg)
-                reply = call_local_llm(prompt, model_id)
-            except Exception as exc:  # broad catch to avoid breaking UI
-                reply = language_data["local_error_template"].format(error=exc)
-                mode = "local_error"
-    elif provider == "groq":
-        if not groq_client:
-            reply = language_data["groq_disabled_template"]
-            mode = "groq_disabled"
-        else:
-            try:
-                model_name = payload.get("model") or DEFAULT_GROQ_MODEL
-                resp = groq_client.chat.completions.create(
-                    model=model_name,
-                    messages=[
-                        {"role": "system", "content": language_data["system_prompt"]},
-                        {"role": "user", "content": user_msg}
-                    ],
-                    temperature=0.3,
-                )
-                reply = resp.choices[0].message.content
-            except Exception as e:
-                reply = language_data["api_error_template"].format(error=e)
-                mode = "error"
-    else:
-        # Default to OpenAI provider
-        if not openai_client:
-            reply = language_data["offline_template"].format(message=user_msg)
-            mode = "offline"
-        else:
-            try:
-                model_name = payload.get("model") or DEFAULT_OPENAI_MODEL
-                resp = openai_client.chat.completions.create(
-                    model=model_name,
-                    messages=[
-                        {"role": "system", "content": language_data["system_prompt"]},
-                        {"role": "user", "content": user_msg}
-                    ],
-                    temperature=0.3,
-                )
-                reply = resp.choices[0].message.content
-            except Exception as e:
-                reply = language_data["api_error_template"].format(error=e)
-                mode = "error"
+            # Default to OpenAI provider
+            if not openai_client:
+                reply = language_data["offline_template"].format(message=user_msg)
+                mode = "offline"
+            else:
+                try:
+                    model_name = payload.get("model") or DEFAULT_OPENAI_MODEL
+                    resp = openai_client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": language_data["system_prompt"]},
+                            {"role": "user", "content": user_msg}
+                        ],
+                        temperature=0.3,
+                    )
+                    reply = resp.choices[0].message.content
+                except Exception as e:
+                    reply = language_data["api_error_template"].format(error=e)
+                    mode = "error"
 
-    # Store conversation in database
-    try:
-        conversation = Conversation(
-            user_message=user_msg,
-            bot_response=reply,
-            session_id=payload.get("session_id", "default")
-        )
-        db.session.add(conversation)
-        db.session.commit()
-    except Exception as e:
-        # Log error but don't break the response
-        # Database errors shouldn't prevent the chatbot from working
-        print(f"Database error (non-fatal): {e}")
+        # Store conversation in database
         try:
-            db.session.rollback()
-        except Exception:
-            pass  # Ignore rollback errors
+            conversation = Conversation(
+                user_message=user_msg,
+                bot_response=reply,
+                session_id=payload.get("session_id", "default")
+            )
+            db.session.add(conversation)
+            db.session.commit()
+        except Exception as e:
+            # Log error but don't break the response
+            # Database errors shouldn't prevent the chatbot from working
+            print(f"Database error (non-fatal): {e}")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass  # Ignore rollback errors
 
-    try:
-        return jsonify({
-            "answer": reply,
-            "mode": mode,
-            "language": language_code,
-            "provider": provider,
-        })
-    except Exception as e:
-        # Even JSON serialization errors should be handled
-        print(f"Error serializing response: {e}")
-        return jsonify({
-            "answer": reply if reply else "Response generated but serialization failed",
-            "mode": mode if mode else "error",
-            "language": language_code if language_code else "en",
-            "provider": provider if provider else "openai",
-        }), 200
+        try:
+            return jsonify({
+                "answer": reply,
+                "mode": mode,
+                "language": language_code,
+                "provider": provider,
+            })
+        except Exception as e:
+            # Even JSON serialization errors should be handled
+            print(f"Error serializing response: {e}")
+            return jsonify({
+                "answer": reply if reply else "Response generated but serialization failed",
+                "mode": mode if mode else "error",
+                "language": language_code if language_code else "en",
+                "provider": provider if provider else "openai",
+            }), 200
     except Exception as e:
         # Catch any unexpected errors in the entire chat function
         print(f"Unexpected error in chat route: {e}")

@@ -1,7 +1,7 @@
 import pytest
 import os
 from unittest.mock import patch, MagicMock
-from app import app, DEFAULT_LOCAL_MODEL, DEFAULT_OPENAI_MODEL
+from app import app, DEFAULT_LOCAL_MODEL, DEFAULT_OPENAI_MODEL, DEFAULT_GROQ_MODEL
 
 
 @pytest.fixture
@@ -132,6 +132,37 @@ class TestChatRoute:
         assert data['provider'] == 'local'
         assert 'Hallo!' in data['answer']
         mock_local_llm.assert_called_once()
+
+    @patch('app.groq_client', None)
+    def test_chat_route_groq_disabled(self, client):
+        """Ensure helpful message when Groq selected without API key."""
+        response = client.post('/chat',
+                             json={'message': 'Hello', 'provider': 'groq', 'language': 'en', 'model': DEFAULT_GROQ_MODEL},
+                             content_type='application/json')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['mode'] == 'groq_disabled'
+        assert data['provider'] == 'groq'
+        assert 'Groq' in data['answer']
+
+    @patch('app.groq_client')
+    def test_chat_route_groq_success(self, mock_groq_client, client):
+        """Test chat route with Groq provider."""
+        mock_response = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = "Groq says hallo!"
+        mock_response.choices = [mock_choice]
+        mock_groq_client.chat.completions.create.return_value = mock_response
+
+        response = client.post('/chat',
+                             json={'message': 'Hello', 'provider': 'groq', 'model': DEFAULT_GROQ_MODEL},
+                             content_type='application/json')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['provider'] == 'groq'
+        assert data['mode'] == 'api'
+        assert 'Groq says hallo' in data['answer']
+        mock_groq_client.chat.completions.create.assert_called_once()
     
     def test_chat_route_invalid_json(self, client):
         """Test chat route with invalid JSON."""

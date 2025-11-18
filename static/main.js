@@ -13,6 +13,7 @@ const modelPicker = document.getElementById("modelPicker");
 const modelOptions = appConfig.modelOptions || {};
 const defaultModels = appConfig.defaultModels || {};
 const localLLMEnabled = appConfig.localLLMEnabled ?? false;
+const groqEnabled = appConfig.groqEnabled ?? false;
 
 const translations = {
   en: {
@@ -29,12 +30,17 @@ const translations = {
     statusSuccess: "All good! Ask away.",
     statusLocalDisabled: "Local model is not enabled. Please start the service or pick OpenAI.",
     statusLocalError: "Local model failed. See logs and try again.",
+    statusGroqDisabled: "Groq isn't configured yet. Add GROQ_API_KEY or switch providers.",
     providerOpenAI: "OpenAI",
     providerLocal: "Local LLM",
+    providerGroq: "Groq",
     providerOpenAINotice: "Using OpenAI (requires API key).",
     providerLocalNotice: localLLMEnabled
       ? "Using the local model. Make sure Ollama is running."
       : "Local model currently disabled.",
+    providerGroqNotice: groqEnabled
+      ? "Using Groq (Llama 3)."
+      : "Groq API key missing – set GROQ_API_KEY.",
     languageChanged: "Got it! I’ll reply in English.",
     languageChangedPrompt: "Language updated to English.",
     modelChanged: "Model switched to {model}.",
@@ -53,12 +59,17 @@ const translations = {
     statusSuccess: "Alles gut! Stell deine Frage.",
     statusLocalDisabled: "Lokales Modell nicht aktiviert. Starte den Dienst oder wähle OpenAI.",
     statusLocalError: "Lokales Modell fehlgeschlagen. Prüfe die Logs und versuche es erneut.",
+    statusGroqDisabled: "Groq ist nicht konfiguriert. Setze GROQ_API_KEY oder wähle einen anderen Provider.",
     providerOpenAI: "OpenAI",
     providerLocal: "Lokales LLM",
+    providerGroq: "Groq",
     providerOpenAINotice: "Verwende OpenAI (API-Schlüssel erforderlich).",
     providerLocalNotice: localLLMEnabled
       ? "Verwende das lokale Modell. Stelle sicher, dass Ollama läuft."
       : "Lokales Modell derzeit deaktiviert.",
+    providerGroqNotice: groqEnabled
+      ? "Verwende Groq (Llama 3)."
+      : "Groq-API-Schlüssel fehlt – setze GROQ_API_KEY.",
     languageChanged: "Alles klar! Ich antworte jetzt auf Deutsch.",
     languageChangedPrompt: "Sprache auf Deutsch umgestellt.",
     modelChanged: "Modell zu {model} gewechselt.",
@@ -85,11 +96,15 @@ function providerLabel(providerId) {
   if (providerId === "local") {
     return t("providerLocal");
   }
+  if (providerId === "groq") {
+    return t("providerGroq");
+  }
   return t("providerOpenAI");
 }
 
 function providerNoticeKey(providerId) {
   if (providerId === "local") return "providerLocalNotice";
+  if (providerId === "groq") return "providerGroqNotice";
   return "providerOpenAINotice";
 }
 
@@ -232,6 +247,9 @@ async function handleSubmit(event) {
       case "local_error":
         setStatus(t("statusLocalError"), "error");
         break;
+      case "groq_disabled":
+        setStatus(t("statusGroqDisabled"), "error");
+        break;
       default:
         setStatus(t("statusSuccess"), "success");
     }
@@ -268,7 +286,9 @@ function handleProviderChange(event) {
     (modelOptions[currentProvider] || [])[0]?.id || "";
   populateModelSelect();
   const noticeKey = providerNoticeKey(currentProvider);
-  const isError = currentProvider === "local" && !localLLMEnabled;
+  const isError =
+    (currentProvider === "local" && !localLLMEnabled) ||
+    (currentProvider === "groq" && !groqEnabled);
   setStatus(t(noticeKey), isError ? "error" : "info");
   updateInsights();
   inputEl.focus();

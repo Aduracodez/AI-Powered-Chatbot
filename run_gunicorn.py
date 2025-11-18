@@ -12,30 +12,43 @@ _original_environ_get = os.environ.get
 
 def safe_environ_get(key, default=None):
     """
-    Wrapper that converts empty strings to default value for numeric environment variables.
+    Wrapper that converts empty strings to None/default for ANY variable.
     This prevents Gunicorn from trying to convert empty strings to integers.
+    If default is numeric (int or numeric string), empty strings become None.
     """
     value = _original_environ_get(key, default)
     
-    # If value is empty string, handle it based on the variable type
+    # If value is empty string, handle it intelligently
     if value == "":
-        # For known numeric variables that Gunicorn might call int() on without defaults
-        numeric_vars = ["WEB_CONCURRENCY", "GUNICORN_PID", "WORKERS", "THREADS"]
-        if key in numeric_vars:
-            # If default is provided, use it; otherwise return None
-            # But for GUNICORN_PID, always return None (Gunicorn sets it itself)
+        # If default is provided and looks numeric, return None (so default is used)
+        # This handles cases like int(os.environ.get('VAR', 0)) where default is numeric
+        if default is not None:
+            # Check if default is numeric (int, or string that looks like a number)
+            try:
+                int(default)
+                # Default is numeric, so return None to use the default
+                return None
+            except (ValueError, TypeError):
+                # Default is not numeric, return empty string
+                return ""
+        
+        # Known problematic variables that Gunicorn converts to int without defaults
+        problematic_vars = ["WEB_CONCURRENCY", "GUNICORN_PID", "LISTEN_FDS", "WORKERS", "THREADS"]
+        if key in problematic_vars:
+            # For GUNICORN_PID, always return None (Gunicorn sets it itself)
             if key == "GUNICORN_PID":
                 return None
-            # For others, use default if provided, otherwise return None
-            return default if default is not None else None
-        # For other vars, return empty string as-is
+            # For others, return None so Gunicorn uses its internal defaults
+            return None
+        
+        # For unknown vars with no default, return empty string
         return ""
     
     return value
 
 # Also clean up any existing empty string values in known problematic vars
 # Do this BEFORE patching, using original environ.get
-for var in ["WEB_CONCURRENCY", "GUNICORN_PID"]:
+for var in ["WEB_CONCURRENCY", "GUNICORN_PID", "LISTEN_FDS"]:
     if _original_environ_get(var) == "":
         os.environ.pop(var, None)
 

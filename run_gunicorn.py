@@ -46,14 +46,18 @@ def safe_environ_get(key, default=None):
     
     return value
 
-# Also clean up any existing empty string values in known problematic vars
-# Do this BEFORE patching, using original environ.get
-for var in ["WEB_CONCURRENCY", "GUNICORN_PID", "LISTEN_FDS"]:
-    if _original_environ_get(var) == "":
-        os.environ.pop(var, None)
+# AGGRESSIVE FIX: Remove ALL empty string environment variables
+# Railway sets many empty strings which cause Gunicorn to crash
+# Better to remove them all than try to handle each one
+empty_vars = [key for key, value in os.environ.items() if value == ""]
+for var in empty_vars:
+    os.environ.pop(var, None)
+if empty_vars:
+    print(f"Removed {len(empty_vars)} empty environment variables: {', '.join(empty_vars[:10])}...")
 
 # Patch os.environ.get BEFORE importing gunicorn
 # This ensures Gunicorn never sees empty strings for numeric vars
+# (as a backup in case Railway sets new ones after cleanup)
 os.environ.get = safe_environ_get
 
 # Now import and run gunicorn - it will use our patched environ.get
@@ -62,7 +66,7 @@ from gunicorn.app.wsgiapp import run
 if __name__ == "__main__":
     sys.argv = [
         "gunicorn",
-        "--bind", f"0.0.0.0:{os.environ.get('PORT', '5000')}",
+        "--bind", f"0.0.0.0:{os.environ.get('PORT', '5050')}",
         "--workers", "2",
         "--threads", "2",
         "--timeout", "120",

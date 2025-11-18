@@ -262,15 +262,17 @@ def handle_exception(e):
 def chat():
     """Chat endpoint - must handle all errors gracefully"""
     try:
-        payload = request.json or {}
-    except Exception as e:
-        return jsonify({
-            "answer": "Invalid request format",
-            "mode": "error",
-            "language": "en",
-            "provider": "openai",
-        }), 400
-    user_msg = payload.get("message", "").strip()
+        try:
+            payload = request.json or {}
+        except Exception as e:
+            return jsonify({
+                "answer": "Invalid request format",
+                "mode": "error",
+                "language": "en",
+                "provider": "openai",
+            }), 400
+        
+        user_msg = payload.get("message", "").strip()
     language_code = (payload.get("language") or DEFAULT_LANGUAGE).lower()
     if language_code not in SUPPORTED_LANGUAGES:
         language_code = DEFAULT_LANGUAGE
@@ -378,6 +380,17 @@ def chat():
             "language": language_code if language_code else "en",
             "provider": provider if provider else "openai",
         }), 200
+    except Exception as e:
+        # Catch any unexpected errors in the entire chat function
+        print(f"Unexpected error in chat route: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "answer": f"An error occurred: {str(e)}",
+            "mode": "error",
+            "language": "en",
+            "provider": "openai",
+        }), 500
 
 
 @app.route("/history", methods=["GET"])

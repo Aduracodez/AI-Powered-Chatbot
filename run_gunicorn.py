@@ -1,32 +1,45 @@
 #!/usr/bin/env python3
 """
-Python wrapper to fix Railway environment variable issues before importing gunicorn
-Railway sets empty strings for various env vars which cause Gunicorn to crash
+Permanent fix for Railway environment variable issues with Gunicorn.
+Railway sets empty strings for env vars which cause Gunicorn's int() conversions to fail.
+This wrapper patches os.environ.get() to return None for empty strings BEFORE Gunicorn imports.
 """
 import os
 import sys
 
-# Fix all problematic environment variables BEFORE importing gunicorn
-# Railway sets these to empty strings which cause int() conversion errors
+# Store original os.environ.get
+_original_environ_get = os.environ.get
 
-def fix_env_var(name, default_value):
-    """Fix an environment variable if it's empty or invalid"""
-    value = os.environ.get(name)
-    if value == "" or value is None:
-        os.environ[name] = default_value
-    elif name in ["WEB_CONCURRENCY", "GUNICORN_PID"] and not value.isdigit():
-        # For numeric vars, ensure they're valid numbers
-        os.environ[name] = default_value
+def safe_environ_get(key, default=None):
+    """
+    Wrapper that converts empty strings to None for numeric environment variables.
+    This prevents Gunicorn from trying to convert empty strings to integers.
+    """
+    value = _original_environ_get(key, default)
+    
+    # If value is empty string and default is None, return None
+    # This allows Gunicorn's int() conversions to work properly
+    if value == "":
+        # For known numeric variables, return None so Gunicorn uses its defaults
+        numeric_vars = ["WEB_CONCURRENCY", "GUNICORN_PID", "WORKERS", "THREADS"]
+        if key in numeric_vars:
+            return None
+        # For other vars, return empty string as-is
+        return ""
+    
+    return value
 
-# Fix all known problematic variables
-fix_env_var("WEB_CONCURRENCY", "1")
-fix_env_var("GUNICORN_PID", "")  # Unset if empty, Gunicorn will set it itself
+# Also clean up any existing empty string values in known problematic vars
+# Do this BEFORE patching, using original environ.get
+for var in ["WEB_CONCURRENCY", "GUNICORN_PID"]:
+    if _original_environ_get(var) == "":
+        os.environ.pop(var, None)
 
-# Remove GUNICORN_PID if it's empty (Gunicorn will set it when needed)
-if os.environ.get("GUNICORN_PID") == "":
-    os.environ.pop("GUNICORN_PID", None)
+# Patch os.environ.get BEFORE importing gunicorn
+# This ensures Gunicorn never sees empty strings for numeric vars
+os.environ.get = safe_environ_get
 
-# Now import and run gunicorn
+# Now import and run gunicorn - it will use our patched environ.get
 from gunicorn.app.wsgiapp import run
 
 if __name__ == "__main__":

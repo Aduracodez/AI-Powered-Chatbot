@@ -12,18 +12,22 @@ _original_environ_get = os.environ.get
 
 def safe_environ_get(key, default=None):
     """
-    Wrapper that converts empty strings to None for numeric environment variables.
+    Wrapper that converts empty strings to default value for numeric environment variables.
     This prevents Gunicorn from trying to convert empty strings to integers.
     """
     value = _original_environ_get(key, default)
     
-    # If value is empty string and default is None, return None
-    # This allows Gunicorn's int() conversions to work properly
+    # If value is empty string, handle it based on the variable type
     if value == "":
-        # For known numeric variables, return None so Gunicorn uses its defaults
+        # For known numeric variables that Gunicorn might call int() on without defaults
         numeric_vars = ["WEB_CONCURRENCY", "GUNICORN_PID", "WORKERS", "THREADS"]
         if key in numeric_vars:
-            return None
+            # If default is provided, use it; otherwise return None
+            # But for GUNICORN_PID, always return None (Gunicorn sets it itself)
+            if key == "GUNICORN_PID":
+                return None
+            # For others, use default if provided, otherwise return None
+            return default if default is not None else None
         # For other vars, return empty string as-is
         return ""
     

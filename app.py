@@ -10,10 +10,13 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 
 # Database configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
-    'DATABASE_URL',
-    f'sqlite:///{os.path.join(basedir, "chatbot.db")}'
-)
+database_url = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(basedir, "chatbot.db")}')
+
+# Fix for Railway/Heroku: convert postgres:// to postgresql://
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -21,7 +24,12 @@ db.init_app(app)
 
 # Create tables
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        # Log error but don't crash - app can still work without database
+        print(f"Warning: Database initialization failed: {e}")
+        print("App will continue but chat history may not be saved.")
 
 SUPPORTED_LANGUAGES = {
     "en": {
@@ -198,6 +206,25 @@ def home():
     return render_template("index.html", app_config=app_config)
 
 
+@app.route("/health")
+def health():
+    """Health check endpoint for production monitoring"""
+    try:
+        # Test database connection
+        db.session.execute("SELECT 1")
+        db_status = "ok"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    return jsonify({
+        "status": "healthy",
+        "database": db_status,
+        "groq_configured": groq_client is not None,
+        "openai_configured": openai_client is not None,
+        "local_llm_enabled": LOCAL_LLM_ENABLED,
+    }), 200
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     payload = request.json or {}
@@ -286,8 +313,12 @@ def chat():
         db.session.commit()
     except Exception as e:
         # Log error but don't break the response
-        print(f"Database error: {e}")
-        db.session.rollback()
+        # Database errors shouldn't prevent the chatbot from working
+        print(f"Database error (non-fatal): {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass  # Ignore rollback errors
 
     return jsonify({
         "answer": reply,
@@ -363,7 +394,7 @@ def clear_history():
 if __name__ == "__main__":
     # Development server only - use gunicorn for production
     debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
-    port = int(os.getenv("PORT", "5055"))
+    port = int(os.getenv("PORT", "5000"))
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     app.run(host=host, port=port, debug=debug_mode)
 

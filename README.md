@@ -4,7 +4,7 @@ A Flask-based chatbot application with OpenAI integration.
 
 ## Features
 
-- 🤖 AI-powered chat using OpenAI GPT-3.5-turbo (or Groq’s Llama 3 models)
+- 🤖 AI-powered chat using OpenAI GPT-3.5-turbo
 - 💾 Database integration with SQLite/PostgreSQL for chat history
 - 🔄 Offline fallback mode (works without API key)
 - 🎨 Modern, clean UI
@@ -46,10 +46,6 @@ pip install -r requirements-dev.txt
 5. Create a `.env` file in the root directory:
 ```bash
 OPENAI_API_KEY=your-api-key-here
-# Optional: Groq LLM (https://console.groq.com)
-# GROQ_API_KEY=your-groq-api-key
-# GROQ_MODEL=llama-3.1-8b-instant
-
 # Optional: For PostgreSQL in production
 # DATABASE_URL=postgresql://user:password@host:port/dbname
 ```

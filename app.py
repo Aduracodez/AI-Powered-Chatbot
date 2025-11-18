@@ -38,7 +38,6 @@ SUPPORTED_LANGUAGES = {
             "(local model unavailable) Enable the local LLM service or choose OpenAI."
         ),
         "local_error_template": "(Local model error) {error}",
-        "groq_disabled_template": "(Groq disabled) Add a GROQ_API_KEY or choose another provider.",
     },
     "de": {
         "label": "German",
@@ -54,7 +53,6 @@ SUPPORTED_LANGUAGES = {
             "(Lokales Modell nicht verfügbar) Aktiviere den lokalen Dienst oder wähle OpenAI."
         ),
         "local_error_template": "(Fehler im lokalen Modell) {error}",
-        "groq_disabled_template": "(Groq deaktiviert) Hinterlege einen GROQ_API_KEY oder wähle einen anderen Provider.",
     },
 }
 DEFAULT_LANGUAGE = "en"
@@ -66,14 +64,6 @@ OPENAI_MODELS = [
     }
 ]
 DEFAULT_OPENAI_MODEL = OPENAI_MODELS[0]["id"]
-
-GROQ_MODELS = [
-    {
-        "id": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
-        "label": os.getenv("GROQ_MODEL_LABEL", "Llama 3.1 8B (Groq)"),
-    }
-]
-DEFAULT_GROQ_MODEL = GROQ_MODELS[0]["id"]
 
 LOCAL_LLM_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 
@@ -111,7 +101,6 @@ LOCAL_LLM_ENABLED = detect_local_llm_enabled()
 
 MODEL_OPTIONS = {
     "openai": OPENAI_MODELS,
-    "groq": GROQ_MODELS,
     "local": [
         {"id": model_id, "label": meta["label"]}
         for model_id, meta in LOCAL_MODELS.items()
@@ -122,7 +111,6 @@ if DEFAULT_PROVIDER not in MODEL_OPTIONS:
     DEFAULT_PROVIDER = "openai"
 DEFAULT_MODELS = {
     "openai": DEFAULT_OPENAI_MODEL,
-    "groq": DEFAULT_GROQ_MODEL,
     "local": DEFAULT_LOCAL_MODEL,
 }
 
@@ -135,16 +123,6 @@ if OPENAI_API_KEY:
         openai_client = OpenAI(api_key=OPENAI_API_KEY)
     except Exception:
         openai_client = None  # fall back gracefully
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-groq_client = None
-if GROQ_API_KEY:
-    try:
-        from groq import Groq
-
-        groq_client = Groq(api_key=GROQ_API_KEY)
-    except Exception:
-        groq_client = None
 
 
 def build_system_prompt(language_data, user_msg):
@@ -190,7 +168,6 @@ def home():
         "defaultProvider": DEFAULT_PROVIDER,
         "defaultModels": DEFAULT_MODELS,
         "localLLMEnabled": LOCAL_LLM_ENABLED,
-        "groqEnabled": groq_client is not None,
     }
     return render_template("index.html", app_config=app_config)
 
@@ -232,25 +209,6 @@ def chat():
             except Exception as exc:  # broad catch to avoid breaking UI
                 reply = language_data["local_error_template"].format(error=exc)
                 mode = "local_error"
-    elif provider == "groq":
-        if not groq_client:
-            reply = language_data["groq_disabled_template"]
-            mode = "groq_disabled"
-        else:
-            try:
-                model_name = payload.get("model") or DEFAULT_GROQ_MODEL
-                resp = groq_client.chat.completions.create(
-                    model=model_name,
-                    messages=[
-                        {"role": "system", "content": language_data["system_prompt"]},
-                        {"role": "user", "content": user_msg}
-                    ],
-                    temperature=0.3,
-                )
-                reply = resp.choices[0].message.content
-            except Exception as e:
-                reply = language_data["api_error_template"].format(error=e)
-                mode = "error"
     else:
         # Default to OpenAI provider
         if not openai_client:
@@ -359,12 +317,7 @@ def clear_history():
 
 if __name__ == "__main__":
     # Development server only - use gunicorn for production
-    # In production, Railway/Render will use gunicorn via Procfile
-    flask_env = os.getenv("FLASK_ENV", "development")
-    debug_mode = (
-        os.getenv("FLASK_DEBUG", "False").lower() == "true"
-        and flask_env != "production"
-    )
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
     port = int(os.getenv("PORT", "5055"))
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     app.run(host=host, port=port, debug=debug_mode)

@@ -9,4 +9,4 @@ NIXPACKS_PHASES = "python"
 [start]
 # Use gunicorn to serve the Flask app in production
 # Unset WEB_CONCURRENCY if it's empty to avoid Gunicorn errors
-cmd = "sh -c 'unset WEB_CONCURRENCY || true; gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 120 wsgi:app'"
+cmd = "bash start.sh"

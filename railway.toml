@@ -7,6 +7,5 @@ builder = "NIXPACKS"
 NIXPACKS_PHASES = "python"
 
 [start]
-# Use gunicorn to serve the Flask app in production
-# Unset WEB_CONCURRENCY if it's empty to avoid Gunicorn errors
-cmd = "bash start.sh"
+# Use Python wrapper to fix WEB_CONCURRENCY issue before Gunicorn imports
+cmd = "python run_gunicorn.py"

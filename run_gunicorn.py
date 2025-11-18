@@ -6,8 +6,14 @@ import os
 import sys
 
 # Fix WEB_CONCURRENCY if it's set to empty string BEFORE importing gunicorn
-if os.environ.get("WEB_CONCURRENCY") == "":
-    del os.environ["WEB_CONCURRENCY"]
+# This must happen before ANY gunicorn imports
+web_concurrency = os.environ.get("WEB_CONCURRENCY")
+if web_concurrency == "" or web_concurrency is None:
+    # Set to a valid default value instead of deleting
+    os.environ["WEB_CONCURRENCY"] = "1"
+elif not web_concurrency.isdigit():
+    # If it's not a valid number, set to default
+    os.environ["WEB_CONCURRENCY"] = "1"
 
 # Now import and run gunicorn
 from gunicorn.app.wsgiapp import run

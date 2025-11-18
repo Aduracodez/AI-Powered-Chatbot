@@ -1,0 +1,12 @@
+# Railway Environment Variables
+# Add these in Railway Dashboard → Your Service → Variables
+
+# Fix for Gunicorn WEB_CONCURRENCY error
+WEB_CONCURRENCY=1
+
+# Your API keys
+GROQ_API_KEY=your-groq-api-key-here
+
+# Optional
+FLASK_ENV=production
+

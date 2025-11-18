@@ -6,6 +6,11 @@ builder = "NIXPACKS"
 # Ensure the Python build phase is enabled
 NIXPACKS_PHASES = "python"
 
+[deploy]
+# Disable auto-detection to force use of our start command
+startCommand = "python run_gunicorn.py"
+
 [start]
 # Use Python wrapper to fix WEB_CONCURRENCY issue before Gunicorn imports
+# IMPORTANT: Also set WEB_CONCURRENCY=1 in Railway Variables to be safe
 cmd = "python run_gunicorn.py"

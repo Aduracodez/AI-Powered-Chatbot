@@ -210,8 +210,8 @@ def home():
 def health():
     """Health check endpoint for production monitoring"""
     try:
-        # Test database connection
-        db.session.execute("SELECT 1")
+        # Test database connection by querying a simple count
+        Conversation.query.limit(1).all()
         db_status = "ok"
     except Exception as e:
         db_status = f"error: {str(e)}"
@@ -394,7 +394,7 @@ def clear_history():
 if __name__ == "__main__":
     # Development server only - use gunicorn for production
     debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
-    port = int(os.getenv("PORT", "5000"))
+    port = int(os.getenv("PORT", "5050"))
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     app.run(host=host, port=port, debug=debug_mode)
 

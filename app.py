@@ -150,12 +150,16 @@ if GROQ_API_KEY:
     try:
         from groq import Groq
         groq_client = Groq(api_key=GROQ_API_KEY)
+        print(f"✓ Groq client initialized successfully (key starts with: {GROQ_API_KEY[:7]}...)")
     except ImportError:
         # Groq package not installed - that's okay, just disable Groq
         groq_client = None
         print("Warning: groq package not installed. Groq provider will be unavailable.")
-    except Exception:
+    except Exception as e:
         groq_client = None
+        print(f"Warning: Failed to initialize Groq client: {e}")
+else:
+    print("Info: GROQ_API_KEY not set. Groq provider will be unavailable.")
 
 
 def build_system_prompt(language_data, user_msg):
@@ -233,10 +237,19 @@ def health():
         except Exception as e:
             db_status = f"error: {str(e)}"
         
+        # Check Groq API key status
+        groq_key_set = bool(os.getenv("GROQ_API_KEY"))
+        groq_key_preview = ""
+        if groq_key_set:
+            key_value = os.getenv("GROQ_API_KEY", "")
+            groq_key_preview = f"{key_value[:7]}..." if key_value else "empty"
+        
         return jsonify({
             "status": "healthy",
             "database": db_status,
             "groq_configured": groq_client is not None,
+            "groq_key_set": groq_key_set,
+            "groq_key_preview": groq_key_preview,
             "openai_configured": openai_client is not None,
             "local_llm_enabled": LOCAL_LLM_ENABLED,
         }), 200
@@ -313,6 +326,7 @@ def chat():
             else:
                 try:
                     model_name = payload.get("model") or DEFAULT_GROQ_MODEL
+                    print(f"Calling Groq API with model: {model_name}")
                     resp = groq_client.chat.completions.create(
                         model=model_name,
                         messages=[
@@ -322,8 +336,12 @@ def chat():
                         temperature=0.3,
                     )
                     reply = resp.choices[0].message.content
+                    print(f"✓ Groq API call successful")
                 except Exception as e:
-                    reply = language_data["api_error_template"].format(error=e)
+                    print(f"✗ Groq API error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    reply = language_data["api_error_template"].format(error=str(e))
                     mode = "error"
         else:
             # Default to OpenAI provider

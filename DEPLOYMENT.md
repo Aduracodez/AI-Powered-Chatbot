@@ -13,8 +13,14 @@ This guide covers deploying the AI Power Chatbot to various production platforms
 Set these in your production environment:
 
 ```bash
-OPENAI_API_KEY=your-openai-api-key
+# Required: At least one AI provider
+OPENAI_API_KEY=your-openai-api-key  # Optional
+GROQ_API_KEY=your-groq-api-key      # Optional (get from https://console.groq.com)
+
+# Database (optional - SQLite used by default)
 DATABASE_URL=postgresql://user:password@host:port/dbname  # For PostgreSQL
+
+# Production settings
 FLASK_ENV=production
 SECRET_KEY=your-secret-key-here  # For session security
 ```
@@ -28,11 +34,18 @@ SECRET_KEY=your-secret-key-here  # For session security
 1. Sign up at [railway.app](https://railway.app)
 2. Click "New Project" → "Deploy from GitHub repo"
 3. Connect your GitHub repository
-4. Add environment variables:
-   - `OPENAI_API_KEY`
-   - `DATABASE_URL` (Railway can provision PostgreSQL automatically)
+4. Add environment variables in Railway dashboard:
+   - **GROQ_API_KEY** (recommended - get from https://console.groq.com)
+   - `OPENAI_API_KEY` (optional)
+   - `DATABASE_URL` (optional - Railway can provision PostgreSQL automatically)
+   - `FLASK_ENV=production` (optional but recommended)
 5. Railway will auto-detect Python and deploy
 6. Your app will be live at `https://your-app.railway.app`
+
+**Important:** After adding environment variables, Railway will automatically redeploy. If changes don't reflect:
+- Go to your Railway project → Settings → Variables
+- Verify all environment variables are set correctly
+- Click "Redeploy" in the Deployments tab to force a new deployment
 
 **Railway will automatically:**
 - Detect `Procfile` and use gunicorn

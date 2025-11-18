@@ -196,38 +196,80 @@ def call_local_llm(prompt: str, model_id: str) -> str:
 
 @app.route("/")
 def home():
-    app_config = {
-        "modelOptions": MODEL_OPTIONS,
-        "defaultProvider": DEFAULT_PROVIDER,
-        "defaultModels": DEFAULT_MODELS,
-        "localLLMEnabled": LOCAL_LLM_ENABLED,
-        "groqEnabled": groq_client is not None,
-    }
-    return render_template("index.html", app_config=app_config)
+    """Home route - must never crash"""
+    try:
+        app_config = {
+            "modelOptions": MODEL_OPTIONS,
+            "defaultProvider": DEFAULT_PROVIDER,
+            "defaultModels": DEFAULT_MODELS,
+            "localLLMEnabled": LOCAL_LLM_ENABLED,
+            "groqEnabled": groq_client is not None,
+        }
+        return render_template("index.html", app_config=app_config)
+    except Exception as e:
+        # Log error but return a basic response so app doesn't crash
+        print(f"Error in home route: {e}")
+        # Return minimal HTML response
+        return f"""
+        <html>
+            <head><title>Chatbot</title></head>
+            <body>
+                <h1>Chatbot</h1>
+                <p>Application is starting up. Please refresh in a moment.</p>
+                <p>Error: {str(e)}</p>
+            </body>
+        </html>
+        """, 200
 
 
 @app.route("/health")
 def health():
-    """Health check endpoint for production monitoring"""
+    """Health check endpoint for production monitoring - must never crash"""
     try:
         # Test database connection by querying a simple count
-        Conversation.query.limit(1).all()
-        db_status = "ok"
+        try:
+            Conversation.query.limit(1).all()
+            db_status = "ok"
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+        
+        return jsonify({
+            "status": "healthy",
+            "database": db_status,
+            "groq_configured": groq_client is not None,
+            "openai_configured": openai_client is not None,
+            "local_llm_enabled": LOCAL_LLM_ENABLED,
+        }), 200
     except Exception as e:
-        db_status = f"error: {str(e)}"
-    
+        # Even the health endpoint should never crash
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Global error handler to prevent crashes"""
+    print(f"Unhandled exception: {e}")
     return jsonify({
-        "status": "healthy",
-        "database": db_status,
-        "groq_configured": groq_client is not None,
-        "openai_configured": openai_client is not None,
-        "local_llm_enabled": LOCAL_LLM_ENABLED,
-    }), 200
+        "error": "An unexpected error occurred",
+        "message": str(e) if app.debug else "Internal server error"
+    }), 500
 
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    payload = request.json or {}
+    """Chat endpoint - must handle all errors gracefully"""
+    try:
+        payload = request.json or {}
+    except Exception as e:
+        return jsonify({
+            "answer": "Invalid request format",
+            "mode": "error",
+            "language": "en",
+            "provider": "openai",
+        }), 400
     user_msg = payload.get("message", "").strip()
     language_code = (payload.get("language") or DEFAULT_LANGUAGE).lower()
     if language_code not in SUPPORTED_LANGUAGES:
@@ -320,12 +362,22 @@ def chat():
         except Exception:
             pass  # Ignore rollback errors
 
-    return jsonify({
-        "answer": reply,
-        "mode": mode,
-        "language": language_code,
-        "provider": provider,
-    })
+    try:
+        return jsonify({
+            "answer": reply,
+            "mode": mode,
+            "language": language_code,
+            "provider": provider,
+        })
+    except Exception as e:
+        # Even JSON serialization errors should be handled
+        print(f"Error serializing response: {e}")
+        return jsonify({
+            "answer": reply if reply else "Response generated but serialization failed",
+            "mode": mode if mode else "error",
+            "language": language_code if language_code else "en",
+            "provider": provider if provider else "openai",
+        }), 200
 
 
 @app.route("/history", methods=["GET"])

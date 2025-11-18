@@ -387,12 +387,15 @@
     </form>
 
     <footer>
-      <span>Powered by Flask + OpenAI</span>
+      <span>Powered by Flask + OpenAI And Built by Precious Oladapo</span>
     </footer>
   </main>
 
+  <script id="app-config-data" type="application/json">
+    {{ app_config | tojson | safe }}
+  </script>
   <script>
-    window.appConfig = {{ app_config | tojson }};
+    window.appConfig = JSON.parse(document.getElementById('app-config-data').textContent);
   </script>
   <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
